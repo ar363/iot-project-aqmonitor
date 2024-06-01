@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+<head>
+    <title>Air Quality Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/versions/bulma-no-dark-mode.min.css">
+
+</head>
+
+<body data-theme="light">
+    <section class="section">
+        <div class="container">
+
+            <h1 class="title" style="margin-bottom: 0.5rem;">Air Quality Monitoring</h1>
+            <p class="subtitle">By - Aditya Raj &amp; Harshit Agarwal</p>
+
+            <p class="hgas" id="hgas"></p>
+            <br>
+
+            <div class="canl">
+                <div class="">
+                    <canvas id="tempchart"></canvas>
+                </div>
+                <div class="">
+                    <canvas id="humchart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <style>
+        body {
+            font-family: "Inter";
+        }
+
+        .canl {
+            display: flex;
+            gap: 1rem;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        /* @media screen and (max-width: 800px) {
+            .canl {
+                flex-direction: column;
+            }
+        } */
+
+        .canl>div {
+            flex-basis: 48%;
+            width: 100%;
+        }
+
+        .hgas {
+            font-size: 1.33rem;
+            font-weight: bold;
+        }
+
+        .has-text-primary {
+            color: var(--bulma-success);
+        }
+
+        .has-text-danger {
+            color: var(--bulma-danger);
+        }
+    </style>
+    <script>
+
+        // Enable pusher logging - don't include this in production
+        Pusher.logToConsole = true;
+
+        let thg_data = []
+
+
+        const tempChart = new Chart(document.getElementById('tempchart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Temperature',
+                        data: []
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    y: {
+                        min: 20,
+                        max: 45,
+                    }
+                },
+                responsive: true,
+            }
+        })
+        const humChart = new Chart(document.getElementById('humchart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        borderColor: "rgb(255, 102, 133)",
+                        backgroundColor: "rgba(255, 102, 133, 0.1)",
+                        label: 'Humidity',
+                        data: []
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                    }
+                },
+                responsive: true,
+            },
+        })
+
+        const charts = [tempChart, humChart]
+
+        var pusher = new Pusher('07d4ee437b7e6c2ff05f', {
+            cluster: 'ap2'
+        });
+
+
+        function renderGas(gas) {
+            document.getElementById('hgas').classList.remove("has-text-primary")
+            document.getElementById('hgas').classList.remove("has-text-danger")
+
+            if (gas === false) {
+                document.getElementById('hgas').classList.add("has-text-primary")
+                document.getElementById('hgas').textContent = 'Dangerous Gases: Not detected'
+            } else {
+                document.getElementById('hgas').classList.add("has-text-danger")
+                document.getElementById('hgas').innerHTML = 'Dangerous Gases: Detected!<br>Alarm has been sounded and authorities notified'
+            }
+        }
+
+        var channel = pusher.subscribe('raspi-proj');
+        channel.bind('status', function (data) {
+
+            const thg_now = { ...data, label: new Date().toTimeString().split(' ')[0] }
+            thg_data.push(thg_now)
+
+            charts.forEach(chart => {
+
+                chart.data.labels.push(thg_now.label)
+                chart.update()
+
+                if (chart.data.datasets[0].data.length > 15) {
+                    thg_data.shift()
+
+                    chart.data.labels.shift()
+                    chart.data.datasets[0].data.shift()
+                    chart.update()
+                }
+            })
+
+            tempChart.data.datasets[0].data.push(thg_now.temp)
+            humChart.data.datasets[0].data.push(thg_now.hum)
+
+
+            renderGas(thg_now.gas)
+
+
+        });
+
+        renderGas(false)
+
+    </script>
+</body>
